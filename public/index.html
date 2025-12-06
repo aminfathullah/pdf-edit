@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Web-Based PDF Editor with WebAssembly - Edit PDFs locally in your browser" />
+    <title>PDF Editor - WebAssembly</title>
+    <style>
+      /* Critical CSS for initial load */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      
+      html, body, #root {
+        height: 100%;
+        width: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      }
+      
+      #root {
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .loading-screen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+      
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      .loading-text {
+        margin-top: 20px;
+        font-size: 18px;
+        opacity: 0.9;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="loading-screen">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Loading PDF Editor...</p>
+      </div>
+    </div>
+    <noscript>You need to enable JavaScript to run this application.</noscript>
+  </body>
+</html>
