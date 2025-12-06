@@ -78,28 +78,45 @@ module.exports = (env, argv) => {
     },
     devtool: isProduction ? 'source-map' : 'eval-source-map',
     optimization: {
+      runtimeChunk: 'single',
       splitChunks: {
         chunks: 'all',
+        minSize: 20000,
+        maxAsyncRequests: 30,
+        maxInitialRequests: 30,
         cacheGroups: {
           vendor: {
             test: /[\\/]node_modules[\\/]/,
             name: 'vendors',
             chunks: 'all',
+            reuseExistingChunk: true,
           },
           pdfjs: {
             test: /[\\/]node_modules[\\/]pdfjs-dist[\\/]/,
             name: 'pdfjs',
-            chunks: 'all',
-            priority: 10,
+            chunks: 'async',
+            priority: 20,
+            reuseExistingChunk: true,
           },
           tesseract: {
             test: /[\\/]node_modules[\\/]tesseract[\\/]/,
             name: 'tesseract',
-            chunks: 'all',
-            priority: 10,
+            chunks: 'async',
+            priority: 20,
+            reuseExistingChunk: true,
+          },
+          common: {
+            minChunks: 2,
+            priority: 5,
+            reuseExistingChunk: true,
           },
         },
       },
+      minimize: isProduction,
+      minimizer: [
+        // Use default Terser minimizer
+        '...',
+      ],
     },
   };
 };

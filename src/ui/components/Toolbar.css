@@ -135,3 +135,14 @@
   padding: 4px 8px;
   border-radius: 10px;
 }
+
+.toolbar-info-btn {
+  margin-left: 4px;
+  color: #0066cc;
+}
+
+.toolbar-info-btn:hover {
+  background: #e6f2ff;
+  color: #0052a3;
+}
+

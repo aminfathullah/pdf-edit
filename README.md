@@ -75,6 +75,56 @@ The built files will be in the `dist/` directory.
 | `←` / `→` | Previous/Next page |
 | `Page Up` / `Page Down` | Navigate pages |
 
+## Implementation Status
+
+### ✅ Completed Phases (1-6)
+
+**Phase 1: Core Rendering & PDF Loading**
+- PDF.js integration with zoom/pan controls
+- Multi-page navigation and lazy loading
+- Canvas-based rendering with caching
+- Drag-and-drop file upload
+- Full-screen toggle (F11)
+- Document information panel (metadata, page count, file size)
+
+**Phase 2: Text Detection & OCR**
+- PDF text layer extraction with bounding boxes
+- Tesseract.js OCR for scanned documents
+- Language pack configuration
+- Worker pool for parallel processing
+
+**Phase 3: Click-to-Edit & Auto-Style Detection**
+- Single-click text selection
+- Automatic font/size/color detection
+- Auto-positioned edit input over text
+- Full undo/redo history (50+ edits)
+
+**Phase 4: Content Erasure & Text Replacement**
+- Intelligent background detection
+- Text masking with color matching
+- Soft edge blending for smooth appearance
+- Multi-edit support with proper z-index
+
+**Phase 5: Text Reflow Logic**
+- Text width calculation and positioning
+- Ellipsis truncation for overflow text
+- User warnings when text doesn't fit
+- Fallback handling
+
+**Phase 6: PDF Generation & Export**
+- PDF export with edits preserved
+- Text layer generation for searchability
+- Metadata preservation and modification timestamps
+- Download functionality with filename generation
+
+### ⏳ Not Started (Phases 7-10)
+- Phase 7: Performance optimization & WASM refinement
+- Phase 8: Advanced features (batch editing, style picker, etc.)
+- Phase 9: Comprehensive testing & QA
+- Phase 10: Documentation & release preparation
+
+**See [PROJECT_ROADMAP.md](docs/PROJECT_ROADMAP.md) for detailed checklist**
+
 ## Project Structure
 
 ```

@@ -111,3 +111,17 @@
     opacity: 1;
   }
 }
+
+/* Fullscreen mode */
+.editor-page:-webkit-full-screen,
+.editor-page:-moz-full-screen,
+.editor-page:-ms-fullscreen,
+.editor-page:fullscreen {
+  height: 100vh;
+  width: 100vw;
+}
+
+.editor-page:-webkit-full-screen {
+  height: 100vh;
+}
+

@@ -5,10 +5,11 @@
  */
 
 import type { Edit, EditOperation, TextStyle, BoundingBox } from '@core/types';
-import { EDIT_CONFIG, EVENTS } from '@core/constants';
+import { EVENTS } from '@core/constants';
 import { generateId } from '@utils/helpers';
 import { eventBus } from '@utils/EventBus';
 import { createLogger } from '@utils/logger';
+import { adaptiveQualityManager } from '@utils/adaptiveQuality';
 
 const logger = createLogger('EditManager');
 
@@ -17,6 +18,28 @@ export class EditManager {
   private history: EditOperation[] = [];
   private historyIndex = -1;
   private activeEditId: string | null = null;
+  private maxHistorySize: number;
+
+  constructor() {
+    // Get initial history size from adaptive quality settings
+    const qualitySettings = adaptiveQualityManager.getSettings();
+    this.maxHistorySize = qualitySettings.editing.maxUndoHistory;
+
+    // Listen for quality level changes
+    adaptiveQualityManager.on('quality-level-changed', (_data: any) => {
+      const newSettings = adaptiveQualityManager.getSettings();
+      const newMaxSize = newSettings.editing.maxUndoHistory;
+      logger.info(`Quality level changed, updating max history size from ${this.maxHistorySize} to ${newMaxSize}`);
+      this.maxHistorySize = newMaxSize;
+
+      // Truncate history if necessary
+      if (this.history.length > this.maxHistorySize) {
+        const removed = this.history.length - this.maxHistorySize;
+        this.history = this.history.slice(removed);
+        this.historyIndex = Math.max(-1, this.historyIndex - removed);
+      }
+    });
+  }
 
   /**
    * Start a new edit operation
@@ -100,8 +123,8 @@ export class EditManager {
     this.history.push(operation);
     this.historyIndex++;
 
-    // Limit history size
-    if (this.history.length > EDIT_CONFIG.MAX_HISTORY_SIZE) {
+    // Limit history size using adaptive quality setting
+    if (this.history.length > this.maxHistorySize) {
       this.history.shift();
       this.historyIndex--;
     }

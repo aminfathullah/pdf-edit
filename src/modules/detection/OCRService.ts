@@ -10,6 +10,7 @@ import { OCR_CONFIG, EVENTS } from '@core/constants';
 import { eventBus } from '@utils/EventBus';
 import { createLogger } from '@utils/logger';
 import { performanceMonitor } from '@utils/performance';
+import { adaptiveQualityManager } from '@utils/adaptiveQuality';
 
 const logger = createLogger('OCRService');
 
@@ -20,6 +21,7 @@ export class OCRService {
   private isInitialized = false;
   private currentLanguage: SupportedLanguage = OCR_CONFIG.DEFAULT_LANGUAGE;
   private initPromise: Promise<void> | null = null;
+  private workerCount: number = OCR_CONFIG.WORKER_POOL_SIZE;
 
   /**
    * Initialize the OCR service with worker pool
@@ -45,10 +47,14 @@ export class OCRService {
       // Terminate existing workers
       await this.terminate();
 
-      logger.info(`Initializing OCR service with language: ${language}`);
+      // Get worker count from adaptive quality settings
+      const qualitySettings = adaptiveQualityManager.getSettings();
+      this.workerCount = qualitySettings.ocr.workerCount;
+
+      logger.info(`Initializing OCR service with language: ${language}, workers: ${this.workerCount}`);
 
       // Create worker pool
-      for (let i = 0; i < OCR_CONFIG.WORKER_POOL_SIZE; i++) {
+      for (let i = 0; i < this.workerCount; i++) {
         const worker = await createWorker(language, 1, {
           logger: (m: { status: string; progress: number }) => {
             if (m.status === 'recognizing text') {
@@ -59,13 +65,19 @@ export class OCRService {
               });
             }
           },
-        });
+        } as any);
 
         this.workers.push(worker);
       }
 
       this.currentLanguage = language;
       this.isInitialized = true;
+
+      // Listen to quality changes and adjust worker count
+      adaptiveQualityManager.on('quality-level-changed', (data: any) => {
+        this.workerCount = data.level === 'high' ? 4 : data.level === 'medium' ? 2 : 1;
+        logger.info(`Quality level changed to ${data.level}, adjusting OCR workers to ${this.workerCount}`);
+      });
 
       const initTime = stopMeasure();
       logger.info(`OCR service initialized in ${initTime.toFixed(2)}ms with ${this.workers.length} workers`);

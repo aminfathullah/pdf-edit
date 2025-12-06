@@ -60,7 +60,9 @@ export const PERFORMANCE_TARGETS = {
 export const OCR_CONFIG = {
   DEFAULT_LANGUAGE: 'eng',
   SUPPORTED_LANGUAGES: ['eng', 'spa', 'fra', 'deu'],
-  CONFIDENCE_THRESHOLD: 0.6,
+  CONFIDENCE_THRESHOLD: 0.6, // Filter out OCR results below this threshold
+  CONFIDENCE_THRESHOLD_MIN: 0.0,
+  CONFIDENCE_THRESHOLD_MAX: 1.0,
   WORKER_POOL_SIZE: 2,
   MAX_RETRIES: 3,
 } as const;

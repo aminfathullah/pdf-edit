@@ -7,10 +7,11 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import type { RenderConfig, PageDimensions } from '@core/types';
-import { RENDERING, EVENTS } from '@core/constants';
+import { EVENTS } from '@core/constants';
 import { eventBus } from '@utils/EventBus';
 import { createLogger } from '@utils/logger';
 import { performanceMonitor } from '@utils/performance';
+import { adaptiveQualityManager } from '@utils/adaptiveQuality';
 
 const logger = createLogger('RenderEngine');
 
@@ -25,12 +26,32 @@ export class RenderEngine {
   private isLoading = false;
 
   constructor(config: RenderConfig = {}) {
+    const qualitySettings = adaptiveQualityManager.getSettings();
     this.config = {
       maxPages: config.maxPages ?? 100,
-      cacheSize: config.cacheSize ?? RENDERING.CACHE_SIZE,
+      cacheSize: config.cacheSize ?? qualitySettings.rendering.cacheSize,
       devicePixelRatio: config.devicePixelRatio ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1),
       quality: config.quality ?? 'high',
     };
+
+    // Listen for quality level changes
+    adaptiveQualityManager.on('quality-level-changed', (data: any) => {
+      const newSettings = adaptiveQualityManager.getSettings();
+      const newCacheSize = newSettings.rendering.cacheSize;
+      logger.info(`Quality level changed to ${data.level}, updating cache size from ${this.config.cacheSize} to ${newCacheSize}`);
+      this.config.cacheSize = newCacheSize;
+
+      // Trim cache if necessary
+      if (this.pageCache.size > this.config.cacheSize) {
+        const toRemove = this.pageCache.size - this.config.cacheSize;
+        let removed = 0;
+        for (const key of this.pageCache.keys()) {
+          if (removed >= toRemove) break;
+          this.pageCache.delete(key);
+          removed++;
+        }
+      }
+    });
   }
 
   /**

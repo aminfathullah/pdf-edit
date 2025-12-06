@@ -30,6 +30,7 @@ import { validatePDFFile, validatePDFMagicBytes } from '@utils/validators';
 import { generateId, formatFileSize } from '@utils/helpers';
 import { createLogger } from '@utils/logger';
 import { performanceMonitor } from '@utils/performance';
+import { adaptiveQualityManager } from '@utils/adaptiveQuality';
 
 const logger = createLogger('PDFEditor');
 
@@ -97,6 +98,10 @@ export class PDFEditor {
     const stopMeasure = performanceMonitor.startMeasure('editor-init');
 
     try {
+      // Initialize quality settings based on device capabilities
+      const quality = adaptiveQualityManager.getQuality();
+      logger.info(`Initializing with ${quality} quality settings`);
+
       // Initialize OCR service (WASM loading)
       await this.ocrService.initialize();
 

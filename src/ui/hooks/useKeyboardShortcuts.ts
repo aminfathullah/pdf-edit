@@ -14,6 +14,7 @@ interface ShortcutConfig {
   onZoomReset?: () => void;
   onNextPage?: () => void;
   onPrevPage?: () => void;
+  onToggleFullscreen?: () => void;
   enabled?: boolean;
 }
 
@@ -27,6 +28,7 @@ export function useKeyboardShortcuts({
   onZoomReset,
   onNextPage,
   onPrevPage,
+  onToggleFullscreen,
   enabled = true,
 }: ShortcutConfig): void {
   useEffect(() => {
@@ -130,6 +132,13 @@ export function useKeyboardShortcuts({
             onPrevPage();
           }
           break;
+
+        case 'F11':
+          if (onToggleFullscreen) {
+            e.preventDefault();
+            onToggleFullscreen();
+          }
+          break;
       }
     };
 
@@ -145,6 +154,7 @@ export function useKeyboardShortcuts({
     onZoomReset,
     onNextPage,
     onPrevPage,
+    onToggleFullscreen,
     enabled,
   ]);
 }

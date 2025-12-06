@@ -2,14 +2,16 @@
  * EditorPage - Main PDF Editor Page Component
  */
 
-import React, { useRef, useCallback } from 'react';
-import { UploadArea, Toolbar, PDFViewer, EditBox } from '../components';
+import React, { useRef, useCallback, useState } from 'react';
+import { UploadArea, Toolbar, PDFViewer, EditBox, DocumentInfoPanel } from '../components';
 import { usePDFEditor, useKeyboardShortcuts } from '../hooks';
 import type { TextBlock, TextStyle } from '@core/types';
 import './EditorPage.css';
 
 export const EditorPage: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDocInfo, setShowDocInfo] = useState(false);
   
   const {
     document,
@@ -54,6 +56,66 @@ export const EditorPage: React.FC = () => {
     onPrevPage: prevPage,
     enabled: !selectedBlock, // Disable when editing
   });
+
+  const toggleFullscreen = useCallback(async () => {
+    const elem = containerRef.current?.parentElement;
+    if (!elem) return;
+    
+    try {
+      if (!isFullscreen) {
+        // Request fullscreen
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if ((elem as any).webkitRequestFullscreen) {
+          await (elem as any).webkitRequestFullscreen();
+        } else if ((elem as any).mozRequestFullScreen) {
+          await (elem as any).mozRequestFullScreen();
+        } else if ((elem as any).msRequestFullscreen) {
+          await (elem as any).msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } else {
+        // Exit fullscreen
+        const doc = globalThis.document as any;
+        if (doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement) {
+          if (doc.exitFullscreen) {
+            await doc.exitFullscreen();
+          } else if (doc.webkitExitFullscreen) {
+            await doc.webkitExitFullscreen();
+          } else if (doc.mozCancelFullScreen) {
+            await doc.mozCancelFullScreen();
+          } else if (doc.msExitFullscreen) {
+            await doc.msExitFullscreen();
+          }
+        }
+        setIsFullscreen(false);
+      }
+    } catch (err) {
+      console.error('Fullscreen toggle error:', err);
+    }
+  }, [isFullscreen]);
+
+  // Listen for fullscreen changes
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      const doc = globalThis.document as any;
+      const isCurrentlyFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement);
+      setIsFullscreen(isCurrentlyFullscreen);
+    };
+
+    const doc = globalThis.document as any;
+    doc.addEventListener('fullscreenchange', handleFullscreenChange);
+    doc.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    doc.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    doc.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      doc.removeEventListener('fullscreenchange', handleFullscreenChange);
+      doc.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      doc.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      doc.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   const handleFileSelect = useCallback((file: File) => {
     loadPDF(file);
@@ -122,6 +184,7 @@ export const EditorPage: React.FC = () => {
         canUndo={canUndo}
         canRedo={canRedo}
         editCount={editCount}
+        isFullscreen={isFullscreen}
         onPrevPage={prevPage}
         onNextPage={nextPage}
         onGoToPage={goToPage}
@@ -132,6 +195,8 @@ export const EditorPage: React.FC = () => {
         onRedo={redo}
         onDownload={handleDownload}
         onNewFile={reset}
+        onToggleFullscreen={toggleFullscreen}
+        onShowDocInfo={() => setShowDocInfo(true)}
       />
 
       <PDFViewer
@@ -167,6 +232,14 @@ export const EditorPage: React.FC = () => {
         <div className="error-toast" role="alert">
           {error}
         </div>
+      )}
+
+      {/* Document Info Panel */}
+      {showDocInfo && (
+        <DocumentInfoPanel
+          document={document}
+          onClose={() => setShowDocInfo(false)}
+        />
       )}
     </div>
   );
