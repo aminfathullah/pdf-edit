@@ -13,13 +13,15 @@ interface MemoryStats {
   arrayBuffers: number;
 }
 
+type MemoryEventCallback<T = unknown> = (data?: T) => void;
+
 class MemoryMonitor {
   private static instance: MemoryMonitor;
   private memoryHistory: MemoryStats[] = [];
   private maxSamples = 60; // Keep 60 samples (~1 min at 1 Hz)
   private isLowEndDevice = false;
   private memoryWarningThreshold = 150 * 1024 * 1024; // 150MB
-  private listeners: Map<string, Function[]> = new Map();
+  private listeners: Map<string, MemoryEventCallback[]> = new Map();
 
   private constructor() {
     this.detectDeviceCapabilities();
@@ -172,7 +174,7 @@ class MemoryMonitor {
   /**
    * Subscribe to memory events
    */
-  on(event: string, callback: Function): void {
+  on(event: string, callback: MemoryEventCallback): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
@@ -182,7 +184,7 @@ class MemoryMonitor {
   /**
    * Unsubscribe from events
    */
-  off(event: string, callback: Function): void {
+  off(event: string, callback: MemoryEventCallback): void {
     const listeners = this.listeners.get(event);
     if (listeners) {
       const index = listeners.indexOf(callback);
@@ -195,7 +197,7 @@ class MemoryMonitor {
   /**
    * Emit event to listeners
    */
-  private emit(event: string, data: any): void {
+  private emit(event: string, data?: unknown): void {
     this.listeners.get(event)?.forEach(cb => cb(data));
   }
 

@@ -5,6 +5,38 @@
 import { getPDFGenerator, PDFGenerator } from '../../../src/modules/export/PDFGenerator';
 import { eventBus } from '../../../src/utils/EventBus';
 import type { Edit } from '../../../src/core/types';
+import { jsPDF } from 'jspdf';
+
+jest.mock('jspdf', () => {
+  jest.requireActual('jspdf');
+  // Provide a mocked jsPDF class for tests so we can spy on file embedding
+  class MockedJsPDF {
+    pages: any[] = [];
+    constructor() {}
+    addPage() { this.pages.push({}); }
+    addImage() {}
+    addFileToVFS(_name: string, _data: string) {}
+    addFont(_f: string, _alias: string, _style: string) {}
+    setFontSize() {}
+    setTextColor() {}
+    text() {}
+    setProperties() {}
+    getFont(name: string) {
+      // Pretend any font requested is available
+      return { name };
+    }
+    setFont(_name: string) {}
+    output(_type: string) {
+      const out = new Uint8Array(256);
+      const header = '%PDF-1.7\n';
+      for (let i = 0; i < header.length; i++) {
+        out[i] = header.charCodeAt(i);
+      }
+      return out.buffer;
+    }
+  }
+  return { jsPDF: MockedJsPDF };
+});
 
 describe('PDFGenerator', () => {
   let generator: PDFGenerator;
@@ -179,6 +211,85 @@ describe('PDFGenerator', () => {
       expect(buffer.byteLength).toBeGreaterThan(0);
     });
 
+    it('should embed fonts when requested', async () => {
+      // Spy on jsPDF methods
+      const addFileSpy = jest.spyOn((jsPDF as any).prototype, 'addFileToVFS');
+      const addFontSpy = jest.spyOn((jsPDF as any).prototype, 'addFont');
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 612;
+      canvas.height = 792;
+
+      const edits: Edit[] = [
+        {
+          id: 'edit-1',
+          pageNumber: 1,
+          timestamp: new Date(),
+          type: 'text-replace',
+          originalText: 'Original',
+          newText: 'Edited',
+          position: { x: 100, y: 100 },
+          originalStyle: {
+            fontFamily: 'TestFont',
+            fontSize: 12,
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            textDecoration: 'none',
+            color: '#000000',
+            backgroundColor: 'transparent',
+            lineHeight: 1.5,
+          },
+          newStyle: {
+            fontFamily: 'TestFont',
+            fontSize: 12,
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            textDecoration: 'none',
+            color: '#000000',
+            backgroundColor: 'transparent',
+            lineHeight: 1.5,
+          },
+          boundingBox: {
+            x: 100,
+            y: 100,
+            width: 50,
+            height: 20,
+          },
+          erasureArea: {
+            x: 100,
+            y: 100,
+            width: 50,
+            height: 20,
+          },
+          status: 'applied',
+        },
+      ];
+
+      const pages = [
+        {
+          canvas,
+          width: 612,
+          height: 792,
+          edits,
+        },
+      ];
+
+      // Call generatePDF with embedFonts and provided embeddedFonts map
+      await generator.generatePDF(pages, {
+        preserveText: true,
+        embedFonts: true,
+        embeddedFonts: { TestFont: 'BASE64DATA' },
+      });
+
+      // Expect that addFileToVFS and addFont were called
+      expect(addFileSpy).toHaveBeenCalledWith('TestFont', 'BASE64DATA');
+      expect(addFontSpy).toHaveBeenCalledWith('TestFont', 'TestFont', 'normal');
+
+      // Clean up spies
+      addFileSpy.mockRestore();
+      addFontSpy.mockRestore();
+    });
+
     it('should skip text layer when preserveText is false', async () => {
       const canvas = document.createElement('canvas');
       canvas.width = 612;
@@ -195,6 +306,31 @@ describe('PDFGenerator', () => {
 
       const buffer = await generator.generatePDF(pages, { preserveText: false });
       expect(buffer.byteLength).toBeGreaterThan(0);
+    });
+
+    it('should handle annotations and form fields when preserve options are used', async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 612;
+      canvas.height = 792;
+
+      const pages = [
+        {
+          canvas,
+          width: 612,
+          height: 792,
+          edits: [] as Edit[],
+          annotations: [{ id: 'a1', type: 'link' }],
+          formFields: [{ id: 'f1', name: 'field1' }],
+        },
+      ];
+
+      const eventSpy = jest.spyOn(eventBus, 'publish');
+
+      const buffer = await generator.generatePDF(pages as any, { preserveAnnotations: true, preserveFormFields: true });
+      expect(buffer.byteLength).toBeGreaterThan(0);
+      expect(eventSpy).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ pageIndex: 0, count: 1 }));
+
+      eventSpy.mockRestore();
     });
   });
 

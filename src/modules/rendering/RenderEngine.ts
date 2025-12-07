@@ -20,6 +20,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export class RenderEngine {
   private pdf: PDFDocumentProxy | null = null;
+  private pdfVersion: string | null = null;
   private pageCache: Map<string, HTMLCanvasElement> = new Map();
   private pageProxyCache: Map<number, PDFPageProxy> = new Map();
   private config: Required<RenderConfig>;
@@ -79,6 +80,18 @@ export class RenderEngine {
       this.pdf = await loadingTask.promise;
 
       const pageCount = this.pdf.numPages;
+      // Try to detect PDF version from pdfjs metadata or pdfInfo
+      try {
+        const meta = await this.pdf.getMetadata();
+        const pdfInfoVersion = (this.pdf as any)?.pdfInfo?.pdfFormatVersion || (meta.info && (((meta.info as any).PDFFormatVersion) || ((meta.info as any).pdfFormatVersion)));
+        this.pdfVersion = pdfInfoVersion ? String(pdfInfoVersion) : null;
+        if (this.pdfVersion) {
+          logger.info(`Detected PDF version: ${this.pdfVersion}`);
+        }
+      } catch (err) {
+        logger.debug('Unable to determine PDF version', err);
+        this.pdfVersion = null;
+      }
       logger.info(`PDF loaded successfully with ${pageCount} pages`);
 
       // Emit event
@@ -226,6 +239,7 @@ export class RenderEngine {
     producer?: string;
     creationDate?: Date;
     modificationDate?: Date;
+    pdfVersion?: string;
   }> {
     if (!this.pdf) {
       throw new Error('No PDF loaded');
@@ -234,7 +248,7 @@ export class RenderEngine {
     const metadata = await this.pdf.getMetadata();
     const info = metadata.info as Record<string, unknown>;
 
-    return {
+    const metadataObj = {
       title: info?.Title as string | undefined,
       author: info?.Author as string | undefined,
       subject: info?.Subject as string | undefined,
@@ -244,6 +258,19 @@ export class RenderEngine {
       creationDate: info?.CreationDate ? new Date(info.CreationDate as string) : undefined,
       modificationDate: info?.ModDate ? new Date(info.ModDate as string) : undefined,
     };
+
+    // Include version if available
+    return {
+      ...metadataObj,
+      pdfVersion: this.pdfVersion ?? undefined,
+    };
+  }
+
+  /**
+   * Get the detected PDF version (if known)
+   */
+  getPDFVersion(): string | null {
+    return this.pdfVersion;
   }
 
   /**

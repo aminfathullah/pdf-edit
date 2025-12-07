@@ -34,6 +34,8 @@ export class PDFExporter {
       width: number;
       height: number;
       edits: Edit[];
+      annotations?: unknown[];
+      formFields?: unknown[];
     }>,
     options: ExportOptions = {}
   ): Promise<{ buffer: ArrayBuffer; filename: string; size: number }> {
@@ -82,6 +84,8 @@ export class PDFExporter {
       width: number;
       height: number;
       edits: Edit[];
+      annotations?: unknown[];
+      formFields?: unknown[];
     }>,
     options: ExportOptions = {}
   ): Promise<void> {
@@ -103,6 +107,8 @@ export class PDFExporter {
       width: number;
       height: number;
       edits: Edit[];
+      annotations?: unknown[];
+      formFields?: unknown[];
     }>,
     options: ExportOptions = {}
   ): Promise<string> {

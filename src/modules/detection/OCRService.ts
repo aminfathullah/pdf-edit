@@ -22,6 +22,9 @@ export class OCRService {
   private currentLanguage: SupportedLanguage = OCR_CONFIG.DEFAULT_LANGUAGE;
   private initPromise: Promise<void> | null = null;
   private workerCount: number = OCR_CONFIG.WORKER_POOL_SIZE;
+  private workerIndex = 0; // round-robin index
+  // Cancellation handled via cancelReject
+  private cancelReject?: (err?: any) => void;
 
   /**
    * Initialize the OCR service with worker pool
@@ -99,7 +102,9 @@ export class OCRService {
       await this.initialize();
     }
 
-    const worker = this.workers[0]; // Use first available worker
+    // Use round-robin to pick a worker for parallelism
+    const worker = this.workers.length > 0 ? this.workers[this.workerIndex % this.workers.length] : this.workers[0];
+    this.workerIndex = (this.workerIndex + 1) % Math.max(1, this.workers.length);
     const stopMeasure = performanceMonitor.startMeasure('ocr-process');
 
     try {
@@ -120,7 +125,12 @@ export class OCRService {
       const imageData = canvas.toDataURL('image/png');
 
       // Run OCR
-      const result = await worker.recognize(imageData);
+      const recognizePromise = worker.recognize(imageData);
+      // Create cancellation promise that rejects when cancel() called
+      const cancelPromise = new Promise((_resolve, reject) => {
+        this.cancelReject = (err?: any) => reject(err ?? new Error('OCR cancelled'));
+      });
+      const result = (await Promise.race([recognizePromise, cancelPromise])) as Tesseract.RecognizeResult;
 
       const processingTime = stopMeasure();
 
@@ -181,7 +191,8 @@ export class OCRService {
       await this.initialize();
     }
 
-    const worker = this.workers[0];
+    const worker = this.workers.length > 0 ? this.workers[this.workerIndex % this.workers.length] : this.workers[0];
+    this.workerIndex = (this.workerIndex + 1) % Math.max(1, this.workers.length);
     const stopMeasure = performanceMonitor.startMeasure('ocr-process-image');
 
     try {
@@ -191,7 +202,11 @@ export class OCRService {
         message: 'Starting OCR...',
       });
 
-      const result = await worker.recognize(imageUrl);
+      const recognizePromise = worker.recognize(imageUrl);
+      const cancelPromise = new Promise((_resolve, reject) => {
+        this.cancelReject = (err?: any) => reject(err ?? new Error('OCR cancelled'));
+      });
+      const result = (await Promise.race([recognizePromise, cancelPromise])) as Tesseract.RecognizeResult;
 
       const processingTime = stopMeasure();
       const boxes = this.extractBoxes(result);
@@ -218,6 +233,26 @@ export class OCRService {
     } catch (error) {
       logger.error('OCR processing failed', error);
       throw error;
+    }
+  }
+
+  /**
+   * Cancel active OCR operations and terminate workers
+   */
+  async cancel(): Promise<void> {
+    // Terminate all workers to cancel any active recognition
+    try {
+      // Reject any pending cancellation promise so runOCR promises reject
+      this.cancelReject?.(new Error('OCR cancelled'));
+      await this.terminate();
+    } catch (error) {
+      logger.warn('Error while cancelling OCR service', error);
+    } finally {
+      // Clean up cancelReject
+      this.cancelReject = undefined;
+      // Re-initialize worker pool if necessary
+      this.initPromise = null;
+      this.isInitialized = false;
     }
   }
 

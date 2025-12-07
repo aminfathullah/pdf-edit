@@ -304,6 +304,12 @@ export interface ExportOptions {
   quality?: 'low' | 'medium' | 'high';
   preserveText?: boolean;
   embedFonts?: boolean;
+  /** Map of font alias to base64 font data for embedding */
+  embeddedFonts?: Record<string, string>;
+  /** Preserve page annotations (if provided) */
+  preserveAnnotations?: boolean;
+  /** Preserve interactive form fields (read-only for export) */
+  preserveFormFields?: boolean;
 }
 
 export interface ExportProgress {

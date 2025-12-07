@@ -170,6 +170,9 @@ export const EVENTS = {
   EXPORT_PROGRESS: 'export-progress',
   EXPORT_COMPLETE: 'export-complete',
   EXPORT_ERROR: 'export-error',
+  // Annotation/Form events
+  ANNOTATIONS_PRESERVED: 'annotations-preserved',
+  FORM_FIELDS_PRESERVED: 'form-fields-preserved',
   
   // General events
   ERROR: 'error',

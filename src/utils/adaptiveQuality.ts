@@ -41,7 +41,7 @@ class AdaptiveQualityManager {
   private static instance: AdaptiveQualityManager;
   private currentLevel: QualityLevel = 'medium';
   private settings: QualitySettings = this.getDefaultSettings('medium');
-  private listeners: Map<string, Function[]> = new Map();
+  private listeners: Map<string, ((data?: unknown) => void)[]> = new Map();
 
   private constructor() {
     this.detectAndSetQuality();
@@ -276,7 +276,7 @@ class AdaptiveQualityManager {
   /**
    * Subscribe to quality changes
    */
-  on(event: string, callback: Function): void {
+  on(event: string, callback: (data?: unknown) => void): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
@@ -286,7 +286,7 @@ class AdaptiveQualityManager {
   /**
    * Unsubscribe from events
    */
-  off(event: string, callback: Function): void {
+  off(event: string, callback: (data?: unknown) => void): void {
     const listeners = this.listeners.get(event);
     if (listeners) {
       const index = listeners.indexOf(callback);
@@ -299,7 +299,7 @@ class AdaptiveQualityManager {
   /**
    * Emit event
    */
-  private emit(event: string, data: any): void {
+  private emit(event: string, data?: unknown): void {
     this.listeners.get(event)?.forEach(cb => cb(data));
   }
 }

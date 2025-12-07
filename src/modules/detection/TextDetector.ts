@@ -84,7 +84,9 @@ export class TextDetector {
         }
 
         // Create character boxes
-        const charBoxes = this.createCharBoxes(textItem.str, x, y, width, height, textItem.fontName);
+        // Detect vertical text: PDFJS may provide dir or transform could indicate rotation
+        const isVertical = (textItem as any).dir === 'ttb' || /vertical/i.test((textItem as any).dir || '');
+        const charBoxes = this.createCharBoxes(textItem.str, x, y, width, height, textItem.fontName, isVertical);
 
         if (!currentBlock) {
           // Start a new block
@@ -146,17 +148,16 @@ export class TextDetector {
     const blocks = this.textBlocksCache.get(pageNum);
     if (!blocks) return null;
 
-    // Find block that contains the point
-    for (const block of blocks) {
-      if (
-        x >= block.x &&
-        x <= block.x + block.width &&
-        y >= block.y &&
-        y <= block.y + block.height
-      ) {
-        return block;
-      }
-    }
+    // Find block(s) that contain the point and pick the smallest area block to handle overlaps
+    const matchingBlocks = blocks.filter((block) => {
+      return x >= block.x && x <= block.x + block.width && y >= block.y && y <= block.y + block.height;
+    });
+
+    if (matchingBlocks.length === 0) return null;
+
+    // Pick the block with smallest bounding box area (more specific)
+    matchingBlocks.sort((a, b) => a.width * a.height - b.width * b.height);
+    return matchingBlocks[0];
 
     return null;
   }
@@ -243,25 +244,46 @@ export class TextDetector {
     y: number,
     totalWidth: number,
     height: number,
-    fontName: string
+    fontName: string,
+    vertical: boolean = false
   ): CharBox[] {
     const boxes: CharBox[] = [];
     const charWidth = text.length > 0 ? totalWidth / text.length : 0;
 
-    let x = startX;
-    for (let i = 0; i < text.length; i++) {
-      boxes.push({
-        char: text[i],
-        index: i,
-        x,
-        y,
-        width: charWidth,
-        height,
-        baseline: y + height * 0.8, // Approximate baseline
-        fontName,
-        fontSize: height,
-      });
-      x += charWidth;
+    if (vertical) {
+      // For vertical layout, maintain x and increment y by charHeight for each character
+      const charHeight = text.length > 0 ? totalWidth / text.length : height; // approximate
+      let charY = y;
+      for (let i = 0; i < text.length; i++) {
+        boxes.push({
+          char: text[i],
+          index: i,
+          x: startX,
+          y: charY,
+          width: charWidth || height,
+          height: charHeight,
+          baseline: charY + charHeight * 0.8,
+          fontName,
+          fontSize: charHeight,
+        });
+        charY += charHeight;
+      }
+    } else {
+      let x = startX;
+      for (let i = 0; i < text.length; i++) {
+        boxes.push({
+          char: text[i],
+          index: i,
+          x,
+          y,
+          width: charWidth,
+          height,
+          baseline: y + height * 0.8, // Approximate baseline
+          fontName,
+          fontSize: height,
+        });
+        x += charWidth;
+      }
     }
 
     return boxes;
@@ -277,13 +299,16 @@ export class TextDetector {
     const isItalic = /italic|oblique/i.test(fontName);
     const isSerif = /serif|times|georgia/i.test(fontName) && !/sans/i.test(fontName);
 
+    // Attempt to read color if provided by PDF text item (some renderers include this)
+    const colorHex = (textItem as any).fillColor || (textItem as any).color || DEFAULTS.TEXT_STYLE.color;
+
     return {
       fontFamily: isSerif ? 'serif' : 'sans-serif',
       fontSize: Math.round(height),
       fontWeight: isBold ? 'bold' : 'normal',
       fontStyle: isItalic ? 'italic' : 'normal',
       textDecoration: 'none',
-      color: DEFAULTS.TEXT_STYLE.color,
+      color: colorHex,
       backgroundColor: 'transparent',
       lineHeight: 1.2,
     };
