@@ -5,6 +5,7 @@
 import React, { useCallback, useState, useRef } from 'react';
 import { formatFileSize } from '@utils/helpers';
 import { FILE_CONSTRAINTS } from '@core/constants';
+import { validatePDFMagicBytes } from '@utils/validators';
 import './UploadArea.css';
 
 interface UploadAreaProps {
@@ -41,10 +42,22 @@ export const UploadArea: React.FC<UploadAreaProps> = ({
   };
 
   const handleFile = useCallback(
-    (file: File) => {
-      if (validateFile(file)) {
-        onFileSelect(file);
+    async (file: File) => {
+      if (!validateFile(file)) return;
+
+      // Verify PDF magic bytes (first bytes of file) as per spec
+      try {
+        const magic = await validatePDFMagicBytes(file);
+        if (!magic.isValid) {
+          setValidationError(magic.error || 'Invalid PDF file');
+          return;
+        }
+      } catch (err) {
+        setValidationError('Failed to verify PDF file');
+        return;
       }
+
+      onFileSelect(file);
     },
     [onFileSelect]
   );

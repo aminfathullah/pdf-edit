@@ -6,6 +6,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { PDFEditor } from '@core/PDFEditor';
 import type { PDFDocument, TextBlock, TextStyle, ExportOptions } from '@core/types';
 import { eventBus } from '@utils/EventBus';
+import type { ViewportState } from '@core/types';
+import { EVENTS } from '@core/constants';
 
 export interface UsePDFEditorReturn {
   // State
@@ -13,6 +15,7 @@ export interface UsePDFEditorReturn {
   currentPage: number;
   totalPages: number;
   zoom: number;
+  viewport: ViewportState;
   textBlocks: TextBlock[];
   selectedBlock: TextBlock | null;
   isLoading: boolean;
@@ -49,6 +52,7 @@ export function usePDFEditor(containerRef: React.RefObject<HTMLDivElement>): Use
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [zoom, setZoomState] = useState(1);
+  const [viewport, setViewport] = useState<ViewportState>({ zoom: 1, panX: 0, panY: 0, currentPage: 1 });
   const [textBlocks, setTextBlocks] = useState<TextBlock[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<TextBlock | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -76,22 +80,37 @@ export function usePDFEditor(containerRef: React.RefObject<HTMLDivElement>): Use
     eventBus.on('edit:added', handleEditAdded);
     eventBus.on('edit:removed', handleEditRemoved);
 
+    // Viewport updates from canvas manager
+    const handleViewportChanged = (vp: any) => {
+      setViewport(vp);
+      // Also update zoom in state if zoom has changed
+      if (typeof vp.zoom === 'number') setZoomState(vp.zoom);
+    };
+
+    eventBus.on(EVENTS.VIEWPORT_CHANGED, handleViewportChanged);
+
     return () => {
       eventBus.off('edit:added', handleEditAdded);
       eventBus.off('edit:removed', handleEditRemoved);
+      eventBus.off(EVENTS.VIEWPORT_CHANGED, handleViewportChanged);
       editorRef.current?.destroy();
     };
   }, []);
 
   // Load PDF
   const loadPDF = useCallback(async (file: File) => {
-    if (!editorRef.current || !containerRef.current) return;
+    if (!editorRef.current) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      editorRef.current.setContainer(containerRef.current);
+      // Only set container if it is already available; otherwise load
+      // the document into the engine and attach the container later.
+      if (containerRef.current) {
+        editorRef.current.setContainer(containerRef.current);
+      }
+
       const doc = await editorRef.current.loadFile(file);
       
       if (doc) {
@@ -110,6 +129,37 @@ export function usePDFEditor(containerRef: React.RefObject<HTMLDivElement>): Use
       setIsLoading(false);
     }
   }, [containerRef]);
+
+  // If the container becomes available after we have already loaded a
+  // document, attach it and re-render the page so the viewer shows the
+  // loaded document.
+  useEffect(() => {
+    if (!editorRef.current || !containerRef.current) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        editorRef.current!.setContainer(containerRef.current!);
+
+        if (editorRef.current!.isLoaded) {
+          const page = editorRef.current!.currentPageNumber;
+          await editorRef.current!.renderPage(page);
+          const blocks = await editorRef.current!.detectText(page);
+          if (!cancelled) {
+            setTextBlocks(blocks);
+            setCurrentPage(page);
+          }
+        }
+      } catch (err) {
+        // Ignore - this shouldn't throw for normal setup
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [containerRef.current]);
 
   // Page navigation
   const goToPage = useCallback(async (page: number) => {
@@ -254,6 +304,7 @@ export function usePDFEditor(containerRef: React.RefObject<HTMLDivElement>): Use
     currentPage,
     totalPages,
     zoom,
+    viewport,
     textBlocks,
     selectedBlock,
     isLoading,

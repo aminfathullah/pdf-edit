@@ -18,6 +18,7 @@ export const EditorPage: React.FC = () => {
     currentPage,
     totalPages,
     zoom,
+    viewport,
     textBlocks,
     selectedBlock,
     isLoading,
@@ -206,18 +207,26 @@ export const EditorPage: React.FC = () => {
         onTextClick={handleTextClick}
         onCanvasClick={handleCanvasClick}
         isEditing={!!selectedBlock}
+        viewport={viewport}
       />
 
       {/* Edit box for selected text */}
-      {selectedBlock && (
-        <EditBox
-          originalText={selectedBlock.text}
-          style={selectedBlock.style}
-          position={{ x: selectedBlock.x, y: selectedBlock.y }}
-          onConfirm={handleEditConfirm}
-          onCancel={cancelEdit}
-        />
-      )}
+      {selectedBlock && (() => {
+        // Compute screen coordinates for the edit box using wrapper rect and viewport
+        const wrapper = containerRef.current?.querySelector('.pdf-canvas-wrapper') as HTMLElement | null;
+        const rect = wrapper?.getBoundingClientRect() || containerRef.current?.getBoundingClientRect();
+        const screenX = rect ? rect.left + selectedBlock.x * viewport.zoom : selectedBlock.x;
+        const screenY = rect ? rect.top + selectedBlock.y * viewport.zoom : selectedBlock.y;
+        return (
+          <EditBox
+            originalText={selectedBlock.text}
+            style={selectedBlock.style}
+            position={{ x: screenX, y: screenY }}
+            onConfirm={handleEditConfirm}
+            onCancel={cancelEdit}
+          />
+        );
+      })()}
 
       {/* Loading overlay */}
       {isProcessing && (

@@ -177,6 +177,7 @@ export const EVENTS = {
   // General events
   ERROR: 'error',
   WARNING: 'warning',
+  VIEWPORT_CHANGED: 'viewport-changed',
 } as const;
 
 // ============================================

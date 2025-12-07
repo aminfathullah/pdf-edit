@@ -77,6 +77,10 @@ export class PDFEditor {
     if (config.container) {
       this.container = config.container;
       this.canvasManager = new CanvasManager(config.container);
+      // Register viewport change listener to re-emit to event bus
+      this.canvasManager.onViewportChanged((viewport) => {
+        this.events.publish(EVENTS.VIEWPORT_CHANGED, viewport);
+      });
     }
 
     // Auto-initialize if requested
@@ -127,6 +131,10 @@ export class PDFEditor {
       this.canvasManager.destroy();
     }
     this.canvasManager = new CanvasManager(container);
+    // Register viewport change listener to re-emit to event bus
+    this.canvasManager.onViewportChanged((viewport) => {
+      this.events.publish(EVENTS.VIEWPORT_CHANGED, viewport);
+    });
   }
 
   /**

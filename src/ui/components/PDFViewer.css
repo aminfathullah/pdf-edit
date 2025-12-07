@@ -17,7 +17,7 @@
 }
 
 .pdf-canvas-container.has-hover {
-  cursor: pointer;
+  cursor: text;
 }
 
 .pdf-canvas-container.editing {
@@ -29,6 +29,11 @@
   top: 0;
   left: 0;
   pointer-events: none;
+}
+
+.pdf-canvas-wrapper {
+  position: relative;
+  display: block;
 }
 
 .text-block-highlight {
@@ -48,6 +53,53 @@
   background: rgba(0, 102, 204, 0.2);
   border-color: #0066cc;
   box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+.text-block-highlight.hovered {
+  outline: 1px dashed rgba(0,0,0,0.08);
+}
+
+.text-block-highlight.source-digital {
+  border-color: rgba(50, 50, 50, 0.05);
+}
+
+.text-block-highlight.source-scanned {
+  border-color: rgba(128, 0, 128, 0.45);
+  background: rgba(128, 0, 128, 0.06);
+}
+
+.text-block-highlight.low-confidence {
+  border-color: rgba(255, 140, 0, 0.8);
+  background: rgba(255, 140, 0, 0.06);
+}
+
+.text-block-highlight.medium-confidence {
+  border-color: rgba(255, 200, 0, 0.5);
+}
+
+.text-block-highlight.high-confidence {
+  border-color: rgba(0, 150, 0, 0.5);
+}
+
+.text-tooltip {
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tooltip-content {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 /* Canvas styles (applied by CanvasManager) */

@@ -17,6 +17,7 @@ export class CanvasManager {
   private overlayCanvas: HTMLCanvasElement;
   private mainContext: CanvasRenderingContext2D;
   private overlayContext: CanvasRenderingContext2D;
+  private wrapper: HTMLDivElement;
   private viewport: ViewportState;
   private isDragging = false;
   private lastMousePos = { x: 0, y: 0 };
@@ -54,11 +55,21 @@ export class CanvasManager {
     `;
     this.overlayContext = this.overlayCanvas.getContext('2d')!;
 
+    // Wrapper element to allow container scroll to reflect scaled canvas size
+    this.wrapper = document.createElement('div');
+    this.wrapper.className = 'pdf-canvas-wrapper';
+    this.wrapper.style.cssText = `
+      position: relative;
+      display: block;
+      width: 0px;
+      height: 0px;
+    `;
     // Setup container
-    this.container.style.position = 'relative';
-    this.container.style.overflow = 'hidden';
-    this.container.appendChild(this.mainCanvas);
-    this.container.appendChild(this.overlayCanvas);
+        this.container.style.position = 'relative';
+        // NOTE: Do not override container overflow here - allow CSS to control scrolling
+    this.wrapper.appendChild(this.mainCanvas);
+    this.wrapper.appendChild(this.overlayCanvas);
+    this.container.appendChild(this.wrapper);
 
     // Setup event handlers
     this.setupEventHandlers();
@@ -87,6 +98,13 @@ export class CanvasManager {
 
     // Update transform
     this.updateTransform();
+    // Ensure container scroll reflects current viewport pan
+    try {
+      this.container.scrollLeft = -Math.round(this.viewport.panX);
+      this.container.scrollTop = -Math.round(this.viewport.panY);
+    } catch (e) {
+      // ignore
+    }
 
     logger.debug('PDF page rendered to canvas');
   }
@@ -178,8 +196,16 @@ export class CanvasManager {
    * Pan the view
    */
   pan(deltaX: number, deltaY: number): void {
-    this.viewport.panX += deltaX;
-    this.viewport.panY += deltaY;
+    // Apply pan by updating container scroll (we treat pan as negative scroll)
+    try {
+      this.container.scrollLeft = this.container.scrollLeft - deltaX;
+      this.container.scrollTop = this.container.scrollTop - deltaY;
+      this.viewport.panX = -this.container.scrollLeft;
+      this.viewport.panY = -this.container.scrollTop;
+    } catch (e) {
+      this.viewport.panX += deltaX;
+      this.viewport.panY += deltaY;
+    }
     this.updateTransform();
     this.emitViewportChange();
   }
@@ -278,9 +304,9 @@ export class CanvasManager {
    * Convert screen coordinates to canvas coordinates
    */
   screenToCanvas(screenX: number, screenY: number): { x: number; y: number } {
-    const rect = this.container.getBoundingClientRect();
-    const x = (screenX - rect.left - this.viewport.panX) / this.viewport.zoom;
-    const y = (screenY - rect.top - this.viewport.panY) / this.viewport.zoom;
+    const rect = this.wrapper.getBoundingClientRect();
+    const x = (screenX - rect.left) / this.viewport.zoom;
+    const y = (screenY - rect.top) / this.viewport.zoom;
     return { x, y };
   }
 
@@ -288,9 +314,9 @@ export class CanvasManager {
    * Convert canvas coordinates to screen coordinates
    */
   canvasToScreen(canvasX: number, canvasY: number): { x: number; y: number } {
-    const rect = this.container.getBoundingClientRect();
-    const x = canvasX * this.viewport.zoom + this.viewport.panX + rect.left;
-    const y = canvasY * this.viewport.zoom + this.viewport.panY + rect.top;
+    const rect = this.wrapper.getBoundingClientRect();
+    const x = canvasX * this.viewport.zoom + rect.left;
+    const y = canvasY * this.viewport.zoom + rect.top;
     return { x, y };
   }
 
@@ -298,9 +324,24 @@ export class CanvasManager {
    * Update canvas transform
    */
   private updateTransform(): void {
-    const transform = `translate(${this.viewport.panX}px, ${this.viewport.panY}px) scale(${this.viewport.zoom})`;
-    this.mainCanvas.style.transform = transform;
-    this.overlayCanvas.style.transform = transform;
+    // Apply scaling via size to allow scroll area to change and map pan via scroll
+    const scaledWidth = this.mainCanvas.width * this.viewport.zoom;
+    const scaledHeight = this.mainCanvas.height * this.viewport.zoom;
+    this.mainCanvas.style.width = `${scaledWidth}px`;
+    this.mainCanvas.style.height = `${scaledHeight}px`;
+    this.overlayCanvas.style.width = `${scaledWidth}px`;
+    this.overlayCanvas.style.height = `${scaledHeight}px`;
+
+    // Keep canvases positioned at top-left within the wrapper (they are absolute), so adjust their transform to apply a non-layout translation
+    // No CSS translate: use container scroll for panning instead. Clear transforms.
+    this.mainCanvas.style.transform = 'none';
+    this.overlayCanvas.style.transform = 'none';
+
+    // Update wrapper size to match scaled canvas so container scrollbars behave properly
+    this.wrapper.style.width = `${scaledWidth}px`;
+    this.wrapper.style.height = `${scaledHeight}px`;
+
+    // Note: container scroll is managed by pan() / scroll event to keep in sync
   }
 
   /**
@@ -372,6 +413,15 @@ export class CanvasManager {
       }, 100)
     );
     resizeObserver.observe(this.container);
+
+    // Sync container scroll with pan
+    this.container.addEventListener('scroll', () => {
+      // Map scroll to pan (scrollLeft increases as content moves left)
+      this.viewport.panX = -this.container.scrollLeft;
+      this.viewport.panY = -this.container.scrollTop;
+      this.updateTransform();
+      this.emitViewportChange();
+    });
   }
 
   /**
@@ -385,8 +435,12 @@ export class CanvasManager {
    * Destroy the canvas manager
    */
   destroy(): void {
-    this.container.removeChild(this.mainCanvas);
-    this.container.removeChild(this.overlayCanvas);
+    if (this.container.contains(this.wrapper)) {
+      this.container.removeChild(this.wrapper);
+    } else {
+      if (this.container.contains(this.mainCanvas)) this.container.removeChild(this.mainCanvas);
+      if (this.container.contains(this.overlayCanvas)) this.container.removeChild(this.overlayCanvas);
+    }
     logger.info('CanvasManager destroyed');
   }
 }

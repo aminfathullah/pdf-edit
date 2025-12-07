@@ -23,7 +23,8 @@ export const EditBox: React.FC<EditBoxProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState(originalText);
-  const [currentStyle] = useState(style);
+  const [currentStyle, setCurrentStyle] = useState(style);
+  const [showStylePanel, setShowStylePanel] = useState(false);
 
   useEffect(() => {
     // Focus and select text on mount
@@ -49,6 +50,14 @@ export const EditBox: React.FC<EditBoxProps> = ({
   const handleConfirm = useCallback(() => {
     onConfirm(text, currentStyle);
   }, [text, currentStyle, onConfirm]);
+
+  const toggleStylePanel = useCallback(() => {
+    setShowStylePanel((s) => !s);
+  }, []);
+
+  const handleStyleChange = useCallback((partial: Partial<typeof currentStyle>) => {
+    setCurrentStyle((prev) => ({ ...prev, ...partial }));
+  }, []);
 
   const textareaStyle: React.CSSProperties = {
     position: 'absolute',
@@ -92,7 +101,61 @@ export const EditBox: React.FC<EditBoxProps> = ({
           style={{ backgroundColor: currentStyle.color }}
           title={currentStyle.color}
         />
+        <button className="btn btn-secondary style-toggle" onClick={toggleStylePanel} aria-label="Toggle style panel">
+          Style
+        </button>
       </div>
+
+        {showStylePanel && (
+          <div
+            className="style-panel"
+            style={{
+              position: 'absolute',
+              left: `${position.x + 120}px`,
+              top: `${position.y - 30}px`,
+              zIndex: 1002,
+              background: '#fff',
+              border: '1px solid #ddd',
+              padding: '8px',
+              borderRadius: '4px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            }}
+          >
+            <label>
+              Font Size
+              <input
+                type="number"
+                aria-label="Font size"
+                value={currentStyle.fontSize}
+                onChange={(e) => handleStyleChange({ fontSize: Number(e.target.value) })}
+                style={{ width: '70px', marginLeft: '8px' }}
+              />
+            </label>
+            <label style={{ display: 'block', marginTop: '8px' }}>
+              Color
+              <input
+                type="text"
+                aria-label="Font color"
+                value={currentStyle.color}
+                onChange={(e) => handleStyleChange({ color: e.target.value })}
+                style={{ width: '120px', marginLeft: '8px' }}
+              />
+            </label>
+            <label style={{ display: 'block', marginTop: '8px' }}>
+              Font Family
+              <select
+                aria-label="Font family"
+                value={currentStyle.fontFamily}
+                onChange={(e) => handleStyleChange({ fontFamily: e.target.value })}
+                style={{ width: '160px', marginLeft: '8px' }}
+              >
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="Times New Roman, serif">Times</option>
+                <option value="Courier New, monospace">Courier</option>
+              </select>
+            </label>
+          </div>
+        )}
 
       {/* Textarea */}
       <textarea

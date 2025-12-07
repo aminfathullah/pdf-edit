@@ -211,6 +211,74 @@ describe('PDFGenerator', () => {
       expect(buffer.byteLength).toBeGreaterThan(0);
     });
 
+    it('should call jsPDF.text for editable text when preserveText is enabled', async () => {
+      const textSpy = jest.spyOn((jsPDF as any).prototype, 'text');
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 612;
+      canvas.height = 792;
+
+      const edits: Edit[] = [
+        {
+          id: 'edit-1',
+          pageNumber: 1,
+          timestamp: new Date(),
+          type: 'text-replace',
+          originalText: 'Original',
+          newText: 'VisibleText',
+          position: { x: 50, y: 60 },
+          originalStyle: {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            textDecoration: 'none',
+            color: '#000000',
+            backgroundColor: 'transparent',
+            lineHeight: 1.5,
+          },
+          newStyle: {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            textDecoration: 'none',
+            color: '#000000',
+            backgroundColor: 'transparent',
+            lineHeight: 1.5,
+          },
+          boundingBox: {
+            x: 50,
+            y: 60,
+            width: 50,
+            height: 20,
+          },
+          erasureArea: {
+            x: 50,
+            y: 60,
+            width: 50,
+            height: 20,
+          },
+          status: 'applied',
+        },
+      ];
+
+      const pages = [
+        {
+          canvas,
+          width: 612,
+          height: 792,
+          edits,
+        },
+      ];
+
+      await generator.generatePDF(pages, { preserveText: true });
+
+      expect(textSpy).toHaveBeenCalledWith('VisibleText', expect.any(Number), expect.any(Number), expect.any(Object));
+
+      textSpy.mockRestore();
+    });
+
     it('should embed fonts when requested', async () => {
       // Spy on jsPDF methods
       const addFileSpy = jest.spyOn((jsPDF as any).prototype, 'addFileToVFS');
