@@ -139,6 +139,36 @@ export const EditorPage: React.FC = () => {
     confirmEdit(newText, newStyle);
   }, [confirmEdit]);
 
+  // Compute the edit box position in a state so we can recalc when the
+  // container ref becomes available (refs are set after initial render).
+  const [editPosition, setEditPosition] = React.useState<{ x: number; y: number } | null>(null);
+
+  React.useEffect(() => {
+    if (!selectedBlock) {
+      setEditPosition(null);
+      return;
+    }
+    const compute = () => {
+      const wrapper = containerRef.current?.querySelector('.pdf-canvas-wrapper') as HTMLElement | null;
+      const rect = wrapper?.getBoundingClientRect() || containerRef.current?.getBoundingClientRect();
+      const screenX = rect ? rect.left + (viewport.panX || 0) + selectedBlock.x * viewport.zoom : (viewport.panX || 0) + selectedBlock.x * viewport.zoom;
+      const screenY = rect ? rect.top + (viewport.panY || 0) + selectedBlock.y * viewport.zoom : (viewport.panY || 0) + selectedBlock.y * viewport.zoom;
+      setEditPosition({ x: screenX, y: screenY });
+    };
+
+    compute();
+
+    // Recompute on scroll / resize to keep overlay synchronized
+    window.addEventListener('scroll', compute, true);
+    window.addEventListener('resize', compute);
+
+    return () => {
+      window.removeEventListener('scroll', compute, true);
+      window.removeEventListener('resize', compute);
+    };
+    // Recompute if selectedBlock or viewport changes; ref changes implicitly due to re-render
+  }, [selectedBlock, viewport.panX, viewport.panY, viewport.zoom, containerRef]);
+
   const handleDownload = useCallback(() => {
     downloadPDF();
   }, [downloadPDF]);
@@ -211,12 +241,11 @@ export const EditorPage: React.FC = () => {
       />
 
       {/* Edit box for selected text */}
-      {selectedBlock && (() => {
+      {selectedBlock && editPosition && (() => {
         // Compute screen coordinates for the edit box using wrapper rect and viewport
-        const wrapper = containerRef.current?.querySelector('.pdf-canvas-wrapper') as HTMLElement | null;
-        const rect = wrapper?.getBoundingClientRect() || containerRef.current?.getBoundingClientRect();
-        const screenX = rect ? rect.left + selectedBlock.x * viewport.zoom : selectedBlock.x;
-        const screenY = rect ? rect.top + selectedBlock.y * viewport.zoom : selectedBlock.y;
+        // Include viewport pan offsets so overlay follows translated canvas
+        const screenX = editPosition.x;
+        const screenY = editPosition.y;
         return (
           <EditBox
             originalText={selectedBlock.text}

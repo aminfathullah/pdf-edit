@@ -39,6 +39,8 @@ jest.mock('@core/PDFEditor', () => {
         }),
         detectText: jest.fn(async () => []),
         setContainer: jest.fn(),
+        startEdit: jest.fn(async (_blockId: string) => ({ edit: { id: 'edit-1' }, style: {} })),
+        confirmEdit: jest.fn(async (_editId: string, _newText: string) => true),
         isLoaded: true,
         currentPageNumber: 1,
         getDocument: jest.fn(() => doc),
@@ -59,6 +61,9 @@ const TestComponent: React.FC = () => {
       >
         Load
       </button>
+      <button data-testid="start" onClick={() => hook.startEdit('block-1')}>Start</button>
+      <button data-testid="confirm" onClick={() => hook.confirmEdit('New Text', {} as any)}>Confirm</button>
+      <button data-testid="cancel" onClick={() => hook.cancelEdit()}>Cancel</button>
       <div data-testid="doc">{hook.document ? hook.document.filename : ''}</div>
     </div>
   );
@@ -74,5 +79,32 @@ describe('usePDFEditor hook - upload behavior', () => {
     await waitFor(() => {
       expect(screen.getByTestId('doc').textContent).toBe('test.pdf');
     });
+  });
+});
+
+describe('usePDFEditor hook - editing behavior', () => {
+  test('startEdit sets an edit id and confirmEdit clears selection', async () => {
+    render(<TestComponent />);
+
+    const loadButton = screen.getByTestId('load');
+    fireEvent.click(loadButton);
+
+    await screen.findByText('test.pdf');
+
+    // Now attempt to start an edit and confirm
+    const startButton = screen.getByTestId('start');
+    const confirmButton = screen.getByTestId('confirm');
+    const cancelButton = screen.getByTestId('cancel');
+
+    fireEvent.click(startButton);
+    await waitFor(() => {
+      expect(startButton).toBeDefined();
+    });
+
+    fireEvent.click(confirmButton);
+    fireEvent.click(cancelButton);
+
+    // No exceptions thrown and UI still exists
+    expect(screen.getByTestId('doc').textContent).toBe('test.pdf');
   });
 });

@@ -35,7 +35,7 @@ export interface UsePDFEditorReturn {
   zoomOut: () => void;
   zoomReset: () => void;
   selectBlock: (block: TextBlock | null) => void;
-  startEdit: (blockId: string) => void;
+  startEdit: (blockId: string) => Promise<void>;
   confirmEdit: (newText: string, newStyle: TextStyle) => void;
   cancelEdit: () => void;
   undo: () => void;
@@ -55,6 +55,8 @@ export function usePDFEditor(containerRef: React.RefObject<HTMLDivElement>): Use
   const [viewport, setViewport] = useState<ViewportState>({ zoom: 1, panX: 0, panY: 0, currentPage: 1 });
   const [textBlocks, setTextBlocks] = useState<TextBlock[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<TextBlock | null>(null);
+  // Track active edit ID created by startEdit to call confirm/cancel with
+  const [activeEditId, setActiveEditId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,33 +219,46 @@ export function usePDFEditor(containerRef: React.RefObject<HTMLDivElement>): Use
     setSelectedBlock(block);
   }, []);
 
-  const startEdit = useCallback((blockId: string) => {
+  const startEdit = useCallback(async (blockId: string) => {
     if (!editorRef.current) return;
-    editorRef.current.startEdit(blockId);
+    try {
+      const res = await editorRef.current.startEdit(blockId);
+      if (res && res.edit) {
+        setActiveEditId(res.edit.id);
+      } else {
+        setActiveEditId(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start edit');
+      setActiveEditId(null);
+    }
   }, []);
 
   const confirmEdit = useCallback((newText: string, newStyle: TextStyle) => {
-    if (!editorRef.current || !selectedBlock) return;
+    if (!editorRef.current || !activeEditId) return;
 
     try {
-      editorRef.current.confirmEdit(selectedBlock.id, newText, newStyle);
+      editorRef.current.confirmEdit(activeEditId, newText, newStyle);
       
       // Update text blocks
       const doc = editorRef.current.getDocument();
       const page = doc?.pages.find(p => p.number === currentPage);
       setTextBlocks(page?.textBlocks || []);
       setSelectedBlock(null);
+      setActiveEditId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to apply edit');
     }
-  }, [selectedBlock, currentPage]);
+  }, [activeEditId, currentPage]);
 
   const cancelEdit = useCallback(() => {
-    if (selectedBlock) {
-      editorRef.current?.cancelEdit(selectedBlock.id);
+    const editIdToCancel = activeEditId || selectedBlock?.id || null;
+    if (editIdToCancel) {
+      editorRef.current?.cancelEdit(editIdToCancel);
     }
     setSelectedBlock(null);
-  }, [selectedBlock]);
+    setActiveEditId(null);
+  }, [activeEditId, selectedBlock]);
 
   // Undo/Redo
   const undo = useCallback(() => {
@@ -291,6 +306,7 @@ export function usePDFEditor(containerRef: React.RefObject<HTMLDivElement>): Use
     setZoomState(1);
     setTextBlocks([]);
     setSelectedBlock(null);
+    setActiveEditId(null);
     setIsLoading(false);
     setIsProcessing(false);
     setError(null);
